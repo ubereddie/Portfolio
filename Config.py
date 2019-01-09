@@ -9,9 +9,3 @@ d = {"key_id": "PKR4H9AURJ12NFU16YFT",
 with open("paper.json", "w") as write_file:
     json.dump(d, write_file)
 
-    print("Hello")
-
-    print("HI")
-
-    print("test")
-
