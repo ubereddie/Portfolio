@@ -1,6 +1,9 @@
 from pylivetrader.api import order_target, symbol
+from pylivetrader import *
 from iexfinance.stocks import Stock
 from iexfinance import get_available_symbols
+from iexfinance import get_iex_listed_symbol_dir
+from iexfinance.stocks import get_todays_earnings
 from iexfinance.base import _IEXBase
 from urllib.parse import quote
 import pandas as pd
@@ -18,7 +21,7 @@ class Target(object):
     
     def __init__(self):
 
-        #self.sectors = {"Utilities":{"sector weight":.10}}
+        #self.sectors = {"Industrials":{"sector weight":.10}}
         self.masterFrame = None
 
         self.sectors = {"Healthcare":{"sector weight":.10},
@@ -29,11 +32,16 @@ class Target(object):
             "Consumer Cyclical":{"sector weight":.12},
             "Real Estate":{"sector weight":.06},
             "Consumer Defensive":{"sector weight":.09},
-            "Energy":{"sector weight":.088},
+            "Energy":{"sector weight":.080},
             "Utilities":{"sector weight":.06},
             "Communication Services":{"sector weight":.13}
             }
 
+    #
+    # method that retuuirns the IEX sectors in a list
+    #
+    def getSectors(self):
+        return [sector for sector in self.sectors]
 
     #
     # checkEPS
@@ -348,6 +356,49 @@ class Target(object):
         self.concatenateFrames()
 
 
+    def getDividendYields(self):
+
+        symbols = [s['symbol'] for s in get_available_symbols()]
+
+
+        dividendStocks = {}
+        batchIndex = 0
+        maxBatch = 99
+        while(batchIndex < len(symbols)):
+            slicedSymbols = symbols[batchIndex:batchIndex + maxBatch]
+            stocks = Stock(slicedSymbols)
+            stats = stocks.get_key_stats()
+            quote = stocks.get_quote()
+            companiesInfo = stocks.get_company()
+
+            for symbol in slicedSymbols:
+                dividendStats = {}
+                try:
+                    if (
+                        stats[symbol]['dividendYield'] and
+                        stats[symbol]['dividendRate'] and
+                        companiesInfo[symbol]['issueType'] and
+                        companiesInfo[symbol]['issueType'] ==  "cs" and
+                        companiesInfo[symbol]['sector'] != 'Financial Services' and
+                        quote[symbol]['sector'] == 'Industrials'
+                    ):
+
+
+
+                        dividendStats['Dividend Yield'] = stats[symbol]['dividendYield']
+                        dividendStats['Dividend Rate'] = stats[symbol]['dividendRate']
+                        dividendStocks[symbol] = dividendStats
+                except:
+                    continue
+            batchIndex += maxBatch
+
+        print(len(dividendStocks))
+        df = pd.DataFrame.from_dict(dividendStocks).T
+        df = df.sort_values('Dividend Yield')
+        print(df)
+
+
+
     #
     # rebalance
     #
@@ -379,6 +430,15 @@ class Target(object):
             except:
                 print('Error: Tried to purchase {} but there was an error.'.format(stock))
                 pass
+
+    #
+    # sendUpdate
+    #
+    # method that send an email update with the day's
+    # performance
+    #
+    def sendUpdate(self, context):
+        print("Send update")
 
     #
     # getWeight
@@ -486,10 +546,30 @@ def get_sector(sector_name):
     return collection.fetch()
 
 
-# myTargets = Target()
+
+myTargets = Target()
+print(myTargets.getSectors())
 # myTargets.displayAllocations()
 # myTargets.updateSectorTargets()
 # myTargets.displayRuntime()
+from iexfinance.stocks import get_sector_performance
+
+df = get_sector_performance(output_format='pandas')
+df = pd.DataFrame.transpose(df)
+df = df['performance']
+print(df)
+
+#myTargets.getDividendYields()
+
+# # Create a Pandas Excel writer using XlsxWriter as the engine.
+# writer = pd.ExcelWriter('pandas_simple.xlsx', engine='xlsxwriter')
+# # Convert the dataframe to an XlsxWriter Excel object.
+# df.to_excel(writer, sheet_name='Sheet1')
+#
+# # Close the Pandas Excel writer and output the Excel file.
+# writer.save()
+
+
 
 #
 # initialize
@@ -504,6 +584,8 @@ def initialize(context):
 
     #context.masterFrame = myTargets.masterFrame
 
+    #schedule_function(myTargets.sendUpdate, date_rule=date_rules.every_day(), time_rule=time_rules.market_close())
+
 def handle_data(context, data):
     # Trading logic
     # order_target orders as many shares as needed to
@@ -512,8 +594,17 @@ def handle_data(context, data):
     #
     # order_target(context.asset, 10)
     # order_target(context.eddie, 10)
-    print(context.portfolio.positions)
+    #print(context.portfolio.positions)
 
+    positions = [equity.symbol for equity in context.portfolio.positions]
+    stocks = Stock(positions)
+    quotes = stocks.get_quote()
+    companies = stocks.get_company()
+
+    for position in positions:
+        basis = context.portfolio.positions[symbol(position)].cost_basis
+        market = quotes[position]['latestPrice']
+        print("{} {} {} {}".format(position, basis, market, companies[position]['sector']))
     #myTargets.rebalance(context)
 
 
