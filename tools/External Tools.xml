@@ -2,13 +2,8 @@
   <tool name="pylivetrader" showInMainMenu="false" showInEditor="false" showInProject="false" showInSearchPopup="false" disabled="false" useConsole="true" showConsoleOnStdOut="true" showConsoleOnStdErr="true" synchronizeAfterRun="true">
     <exec>
       <option name="COMMAND" value="$PyInterpreterDirectory$/pylivetrader" />
-      <option name="PARAMETERS" value="run /Users/edddie/PycharmProjects/Portfolio/Portfolio.py --backend-config paper.json" />
+      <option name="PARAMETERS" value="run /Users/eddie/PycharmProjects/Portfolio/Portfolio.py --backend-config paper.json" />
       <option name="WORKING_DIRECTORY" value="$ProjectFileDir$" />
     </exec>
-    <filter>
-      <option name="NAME" value="" />
-      <option name="DESCRIPTION" value="" />
-      <option name="REGEXP" value="$FILE_PATH$:$LINE$:$COLUMN$:.*" />
-    </filter>
   </tool>
 </toolSet>
