@@ -1,11 +1,11 @@
 import json
 
 
-d = {"key_id": "PKR4H9AURJ12NFU16YFT",
-    "secret": "ov525A/An/sC5mR0fcoI4ZVClzyTTrOqg0CGQolH",
-    "base_url": "https://paper-api.alpaca.markets"}
+d = {"key_id": "AK6MLMQ67NQU1E0IVW1X",
+    "secret": "ORmHymf5Rb9zD5MzBsyHnLj0z2cE01OnCOU54r1s",
+    "base_url": "https://api.alpaca.markets"}
 
 
-with open("paper.json", "w") as write_file:
+with open("live.json", "w") as write_file:
     json.dump(d, write_file)
 
