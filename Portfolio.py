@@ -7,6 +7,7 @@ from iexfinance.stocks import get_todays_earnings
 from iexfinance.base import _IEXBase
 from urllib.parse import quote
 import pandas as pd
+from Reports import *
 import datetime
 
 
@@ -548,101 +549,10 @@ def get_sector(sector_name):
 
 
 myTargets = Target()
-# print(myTargets.getSectors())
+generateEndDayReport(myTargets.getSectors())
 
-
-
-# myTargets.displayAllocations()
-# myTargets.updateSectorTargets()
-# myTargets.displayRuntime()
-# from iexfinance.stocks import get_sector_performance
-#
-# df = get_sector_performance(output_format='pandas')
-# df = pd.DataFrame.transpose(df)
-# df = df['performance']
-# print(df)
-
-df = pd.read_pickle("positions.pkl")
-df['cost basis'] = df['basis'] * df['amount']
-df['market value'] = df['market'] * df['amount']
-df['gain/loss%'] = (df['market'] - df['basis'])/df['basis']
-df['gain/loss$'] = df['market value'] - df['cost basis']
-df['PL%'] = (df['gain/loss$']/df['gain/loss$'].sum())
-
-df = df.sort_values('sector')
-
-df = df[['amount', 'basis', 'market', 'cost basis', 'market value', 'gain/loss%', 'gain/loss$', 'PL%', 'sector']]
-
-df['gain/loss%'] = df['gain/loss%'].apply('{:,.2%}'.format)
-#df['PL%'] = df['PL%'].apply("{:,.2%}".format)
-#print(df.to_string())
-
-# print("P/L Total ${}".format(df['gain/loss$'].sum()))
-# print(df['gain/loss%'].sum())
-# print(df['PL%'].sum())
-
-yieldList = []
-sectorList = []
-for sector in myTargets.getSectors():
-    if sector in df.sector.values:
-
-        sectorReturn = df.loc[df['sector'] == sector, 'PL%'].sum()
-        yieldList.append(sectorReturn)
-        sectorList.append(sector)
-#
-#
-dfSector = pd.DataFrame(data=yieldList, columns=['sector%'], index=sectorList)
-dfSector.loc['Total'] = dfSector.sum()
-
-
-#df['gain/loss%'] = df['gain/loss%'].apply('{:,.2f}'.format)
-df['PL%'] = df['PL%'].apply("{:,.2%}".format)
-print(df.to_string())
-print(dfSector.to_string(header=["Sector Returns(%)"], formatters={'sector%':'{:,.2%}'.format}))
-
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-
-try:
-    server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
-    server.ehlo()  # optional    # ...send emails
-    server.login("eddie@exigenthq.com", "froboz7104!")
-
-    email="eddie@exigenthq.com"
-    msg = MIMEMultipart()
-
-    # setup the parameters of the message
-    msg['From'] = 'eddie@exigenthq.com'
-    msg['To'] = 'eddie@exigenthq.com'
-    msg['Subject'] = "This is TEST"
-
-    # add in the message body
-    msg.attach(MIMEText(df.to_html(), 'HTML'))
-    #server.sendmail(email, email, "test mail")
-
-    server.send_message(msg)
-    del msg
-
-    # Terminate the SMTP session and close the connection
-    server.quit()
-    #server.close()
-
-    print('Email sent!')
-except Exception as e:
-    print ('Something went wrong...{}'.format(e))
 
 #myTargets.getDividendYields()
-
-# # Create a Pandas Excel writer using XlsxWriter as the engine.
-# writer = pd.ExcelWriter('pandas_simple.xlsx', engine='xlsxwriter')
-# # Convert the dataframe to an XlsxWriter Excel object.
-# df.to_excel(writer, sheet_name='Sheet1')
-#
-# # Close the Pandas Excel writer and output the Excel file.
-# writer.save()
-
-
 
 #
 # initialize
@@ -657,51 +567,10 @@ def initialize(context):
 
     #context.masterFrame = myTargets.masterFrame
 
-    #schedule_function(myTargets.sendUpdate, date_rule=date_rules.every_day(), time_rule=time_rules.market_close())
+    schedule_function(generateEndDayFile, date_rule=date_rules.every_day(), time_rule=time_rules.market_close())
 
 def handle_data(context, data):
-    # Trading logic
-    # order_target orders as many shares as needed to
-    # achieve the desired number of shares.
-    # print("placing Order {}".format(context.asset))
-    #
-    # order_target(context.asset, 10)
-    # order_target(context.eddie, 10)
-    #print(context.portfolio.positions)
-
-    positions = [equity.symbol for equity in context.portfolio.positions]
-    stocks = Stock(positions)
-    quotes = stocks.get_quote()
-    companies = stocks.get_company()
-
-    positionsDict = {}
-    for position in positions:
-        assetData = {}
-
-        basis = context.portfolio.positions[symbol(position)].cost_basis
-        assetData['basis'] = basis
-
-        shares = context.portfolio.positions[symbol(position)].amount
-        assetData['amount'] = shares
-
-        market = quotes[position]['latestPrice']
-        assetData['market'] = market
-
-        assetData['sector'] = companies[position]['sector']
-        positionsDict[position] = assetData
-
-
-        #print("{} {} {} {}".format(position, basis, market, companies[position]['sector']))
-
-    df = pd.DataFrame.from_dict(positionsDict).T
-    print(df.to_string())
-    try:
-        df.to_pickle("positions.pkl")
-    except:
-        print("Shit")
-
-
-    #myTargets.rebalance(context)
+    pass
 
 
 
