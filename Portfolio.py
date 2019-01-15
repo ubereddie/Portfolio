@@ -22,7 +22,7 @@ class Target(object):
     
     def __init__(self):
 
-        #self.sectors = {"Industrials":{"sector weight":.10}}
+        # self.sectors = {"Energy":{"sector weight":.10}}
         self.masterFrame = None
 
         self.sectors = {"Healthcare":{"sector weight":.10},
@@ -331,7 +331,7 @@ class Target(object):
             #
             # apply the data criteria
             #
-            df = df[(df.current_ratio > 1.5) & (df.pe_ratio < 9) & (df.pb_ratio < 1.2) & (df.dividend_yield > 1.0)]
+            df = df[(df.current_ratio > 1.5) & (df.pe_ratio < 16) & (df.pb_ratio < 1.2) & (df.dividend_yield > 1.0)]
 
             #
             # check to see that we have stocks in the sctor.  Sector weighting is done
@@ -489,11 +489,14 @@ class Target(object):
         # output the allocations at startup
         #
         df = pd.DataFrame.from_dict(self.sectors).T
+        df = df[['sector weight']]
+
+
         if sum(df['sector weight'] > 100):
             print("Allocation exceeds 100%")
 
         df.loc['sum'] = df.sum()
-        print("{}\n".format(df.to_string()))
+        print("{}\n".format(df.to_string(formatters={'sector weight': '{:,.2%}'.format})))
 
     #
     # displayMaster Frame
@@ -506,15 +509,15 @@ class Target(object):
 
         if(self.masterFrame is not None):
             df = self.masterFrame
-            df = df.applymap("{:,.2f}".format)
+            df = df.applymap("{:,.4f}".format)
 
             #
             # nice user labels
             #
             df.columns = ['Weight', 'Current', 'Debt/Lq', 'Dividend', 'Market Cap', 'Price/Book', 'PE']
 
-            print("Master Frame\n{}\n".format(df.to_string()))
-            print("Master Frame Weight: {:.4}".format(self.masterFrame['Weight'].sum()))
+            print("Master Frame -> {}\n{}\n".format(df['Current'].count(), df.to_string()))
+            print("Master Frame Weight: {:.4}\n\n".format(self.masterFrame['Weight'].sum()))
 
     def displayRuntime(self):
         self.displayFrame()
@@ -549,7 +552,11 @@ def get_sector(sector_name):
 
 
 myTargets = Target()
-generateEndDayReport(myTargets.getSectors())
+#myTargets.updateSectorTargets()
+#myTargets.displayRuntime()
+#myTargets.displayAllocations()
+
+#generateEndDayReport(myTargets.getSectors())
 
 
 #myTargets.getDividendYields()
@@ -566,10 +573,11 @@ def initialize(context):
     # myTargets.updateSectorTargets()
 
     #context.masterFrame = myTargets.masterFrame
-
+    context.sectors = myTargets.getSectors()
     schedule_function(generateEndDayFile, date_rule=date_rules.every_day(), time_rule=time_rules.market_close())
 
 def handle_data(context, data):
+    #myTargets.rebalance(context)
     pass
 
 

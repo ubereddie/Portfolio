@@ -2,6 +2,8 @@ import pandas as pd
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from iexfinance.stocks import Stock
+from pylivetrader.api import order_target, symbol
 
 
 #
@@ -10,14 +12,18 @@ from email.mime.text import MIMEText
 # method that creates an HTML email and sends using the
 # Google email system
 #
-def sendReport(df):
+def sendReport(dfSector, dfPos):
 
+    #
+    # build a list of email recipients
+    #
     with open('recipients') as f:
         emails = f.read().splitlines()
     f.close()
 
-    #recipients = ["eddie@exigenthq.com", "ubereddie@icloud.com"]
-
+    #
+    # compse the email
+    #
     try:
         server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
         server.ehlo()  # optional    # ...send emails
@@ -32,10 +38,11 @@ def sendReport(df):
             msg['Subject'] = "Eddie's Stock Follyio Report"
 
             # add in the message body
-            msg.attach(MIMEText(df.to_html(), 'HTML'))
+            test = dfSector.to_html() + "<br><br>"
+            msg.attach(MIMEText(test, 'HTML'))
+
+            msg.attach(MIMEText(dfPos.to_html(), 'HTML'))
             # server.sendmail(email, email, "test mail")
-
-
 
             server.send_message(msg)
             del msg
@@ -48,6 +55,39 @@ def sendReport(df):
         print('Error: could not send email...{}'.format(e))
 
 #
+# generateEndDayReport
+#
+# method that reads the positions and associated data in from the pickle
+# file created at market close and then generate a data frame.  Finally
+# the data frame is emailed out a HTML document
+#
+def generateEndDayReport(sectors):
+
+    dfPos = generatePositions()
+    dfSector = generateSectors(dfPos, sectors)
+
+
+    #
+    # display the posiution data frame to the user
+    #
+    dfPos['gain/loss%'] = dfPos['gain/loss%'].apply('{:,.2%}'.format)
+    dfPos['PL%'] = dfPos['PL%'].apply("{:,.2%}".format)
+    print(dfPos.to_string())
+
+    #
+    # display the sector contributions
+    #
+    dfSector = dfSector.applymap("{:,.2%}".format)
+    dfSector.columns = ['Sector Returns(%)']
+
+    print(dfSector.to_string(formatters={'sector%': '{:,.2%}'.format}))
+
+    #
+    # send the email
+    #
+    sendReport(dfSector, dfPos)
+
+#
 # generateEndDayFile
 #
 # method called at the end of day that processes the portoflio
@@ -55,7 +95,7 @@ def sendReport(df):
 # so that a report can be generated later without having to have the
 # market be active
 #
-def generateEndDayFile(context):
+def generateEndDayFile(context, data):
 
     #
     # get all the postions hel;d on account
@@ -117,8 +157,10 @@ def generateEndDayFile(context):
 
     try:
         df.to_pickle("positions.pkl")
+        generateEndDayReport(context.sectors)
     except:
-        print("Error: could not genrate report pickle file")
+        print("Error: could not generate report pickle file")
+
 
 #
 # generatePositions
@@ -182,40 +224,6 @@ def generateSectors(df, sectors):
     dfSector.loc['Total'] = dfSector.sum()
 
     return dfSector
-
-#
-# generateEndDayReport
-#
-# method that reads the positions and associated data in from the pickle
-# file created at market close and then generate a data frame.  Finally
-# the data frame is emailed out a HTML document
-#
-def generateEndDayReport(sectors):
-
-    dfPos = generatePositions()
-    dfSector = generateSectors(dfPos, sectors)
-
-
-    #
-    # display the posiution data frame to the user
-    #
-    dfPos['gain/loss%'] = dfPos['gain/loss%'].apply('{:,.2%}'.format)
-    dfPos['PL%'] = dfPos['PL%'].apply("{:,.2%}".format)
-    print(dfPos.to_string())
-
-    #
-    # display the sector contributions
-    #
-    print(dfSector.to_string(header=["Sector Returns(%)"], formatters={'sector%': '{:,.2%}'.format}))
-
-    #
-    # send the email
-    #
-    sendReport(dfPos)
-
-
-
-
 
 
 # myTargets.displayAllocations()
