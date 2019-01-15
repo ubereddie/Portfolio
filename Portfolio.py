@@ -1,9 +1,13 @@
 from pylivetrader.api import order_target, symbol
+from pylivetrader import *
 from iexfinance.stocks import Stock
 from iexfinance import get_available_symbols
+from iexfinance import get_iex_listed_symbol_dir
+from iexfinance.stocks import get_todays_earnings
 from iexfinance.base import _IEXBase
 from urllib.parse import quote
 import pandas as pd
+from Reports import *
 import datetime
 
 
@@ -18,7 +22,7 @@ class Target(object):
     
     def __init__(self):
 
-        #self.sectors = {"Utilities":{"sector weight":.10}}
+        # self.sectors = {"Energy":{"sector weight":.10}}
         self.masterFrame = None
 
         self.sectors = {"Healthcare":{"sector weight":.10},
@@ -29,11 +33,16 @@ class Target(object):
             "Consumer Cyclical":{"sector weight":.12},
             "Real Estate":{"sector weight":.06},
             "Consumer Defensive":{"sector weight":.09},
-            "Energy":{"sector weight":.088},
+            "Energy":{"sector weight":.080},
             "Utilities":{"sector weight":.06},
             "Communication Services":{"sector weight":.13}
             }
 
+    #
+    # method that retuuirns the IEX sectors in a list
+    #
+    def getSectors(self):
+        return [sector for sector in self.sectors]
 
     #
     # checkEPS
@@ -322,7 +331,7 @@ class Target(object):
             #
             # apply the data criteria
             #
-            df = df[(df.current_ratio > 1.5) & (df.pe_ratio < 9) & (df.pb_ratio < 1.2) & (df.dividend_yield > 1.0)]
+            df = df[(df.current_ratio > 1.5) & (df.pe_ratio < 16) & (df.pb_ratio < 1.2) & (df.dividend_yield > 1.0)]
 
             #
             # check to see that we have stocks in the sctor.  Sector weighting is done
@@ -346,6 +355,49 @@ class Target(object):
         # the sctor frames
         #
         self.concatenateFrames()
+
+
+    def getDividendYields(self):
+
+        symbols = [s['symbol'] for s in get_available_symbols()]
+
+
+        dividendStocks = {}
+        batchIndex = 0
+        maxBatch = 99
+        while(batchIndex < len(symbols)):
+            slicedSymbols = symbols[batchIndex:batchIndex + maxBatch]
+            stocks = Stock(slicedSymbols)
+            stats = stocks.get_key_stats()
+            quote = stocks.get_quote()
+            companiesInfo = stocks.get_company()
+
+            for symbol in slicedSymbols:
+                dividendStats = {}
+                try:
+                    if (
+                        stats[symbol]['dividendYield'] and
+                        stats[symbol]['dividendRate'] and
+                        companiesInfo[symbol]['issueType'] and
+                        companiesInfo[symbol]['issueType'] ==  "cs" and
+                        companiesInfo[symbol]['sector'] != 'Financial Services' and
+                        quote[symbol]['sector'] == 'Industrials'
+                    ):
+
+
+
+                        dividendStats['Dividend Yield'] = stats[symbol]['dividendYield']
+                        dividendStats['Dividend Rate'] = stats[symbol]['dividendRate']
+                        dividendStocks[symbol] = dividendStats
+                except:
+                    continue
+            batchIndex += maxBatch
+
+        print(len(dividendStocks))
+        df = pd.DataFrame.from_dict(dividendStocks).T
+        df = df.sort_values('Dividend Yield')
+        print(df)
+
 
 
     #
@@ -379,6 +431,15 @@ class Target(object):
             except:
                 print('Error: Tried to purchase {} but there was an error.'.format(stock))
                 pass
+
+    #
+    # sendUpdate
+    #
+    # method that send an email update with the day's
+    # performance
+    #
+    def sendUpdate(self, context):
+        print("Send update")
 
     #
     # getWeight
@@ -428,11 +489,14 @@ class Target(object):
         # output the allocations at startup
         #
         df = pd.DataFrame.from_dict(self.sectors).T
+        df = df[['sector weight']]
+
+
         if sum(df['sector weight'] > 100):
             print("Allocation exceeds 100%")
 
         df.loc['sum'] = df.sum()
-        print("{}\n".format(df.to_string()))
+        print("{}\n".format(df.to_string(formatters={'sector weight': '{:,.2%}'.format})))
 
     #
     # displayMaster Frame
@@ -445,15 +509,15 @@ class Target(object):
 
         if(self.masterFrame is not None):
             df = self.masterFrame
-            df = df.applymap("{:,.2f}".format)
+            df = df.applymap("{:,.4f}".format)
 
             #
             # nice user labels
             #
             df.columns = ['Weight', 'Current', 'Debt/Lq', 'Dividend', 'Market Cap', 'Price/Book', 'PE']
 
-            print("Master Frame\n{}\n".format(df.to_string()))
-            print("Master Frame Weight: {:.4}".format(self.masterFrame['Weight'].sum()))
+            print("Master Frame -> {}\n{}\n".format(df['Current'].count(), df.to_string()))
+            print("Master Frame Weight: {:.4}\n\n".format(self.masterFrame['Weight'].sum()))
 
     def displayRuntime(self):
         self.displayFrame()
@@ -486,10 +550,16 @@ def get_sector(sector_name):
     return collection.fetch()
 
 
-# myTargets = Target()
-# myTargets.displayAllocations()
-# myTargets.updateSectorTargets()
-# myTargets.displayRuntime()
+
+myTargets = Target()
+#myTargets.updateSectorTargets()
+#myTargets.displayRuntime()
+#myTargets.displayAllocations()
+
+#generateEndDayReport(myTargets.getSectors())
+
+
+#myTargets.getDividendYields()
 
 #
 # initialize
@@ -503,18 +573,12 @@ def initialize(context):
     # myTargets.updateSectorTargets()
 
     #context.masterFrame = myTargets.masterFrame
+    context.sectors = myTargets.getSectors()
+    schedule_function(generateEndDayFile, date_rule=date_rules.every_day(), time_rule=time_rules.market_close())
 
 def handle_data(context, data):
-    # Trading logic
-    # order_target orders as many shares as needed to
-    # achieve the desired number of shares.
-    # print("placing Order {}".format(context.asset))
-    #
-    # order_target(context.asset, 10)
-    # order_target(context.eddie, 10)
-    print(context.portfolio.positions)
-
     #myTargets.rebalance(context)
+    pass
 
 
 
